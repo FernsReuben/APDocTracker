@@ -58,8 +58,9 @@ const getClientDocStatus = (emails: EmailThread[], clientName: string) => {
 export default function IntakeDashboard() {
   const [emails, setEmails] = useState<EmailThread[]>([]);
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
-  const [pendingReminderClient, setPendingReminderClient] =
-    useState<string | null>(null);
+  const [pendingReminderClient, setPendingReminderClient] = useState<
+    string | null
+  >(null);
 
   // 🌙 DARK MODE
   const getInitialTheme = () => {
@@ -70,7 +71,7 @@ export default function IntakeDashboard() {
 
   const [isDark, setIsDark] = useState(getInitialTheme);
   const [manualOverride, setManualOverride] = useState(
-    localStorage.getItem("theme") !== null
+    localStorage.getItem("theme") !== null,
   );
 
   useEffect(() => {
@@ -175,11 +176,11 @@ export default function IntakeDashboard() {
               documents: email.documents.map((doc) =>
                 doc.id === docId
                   ? { ...doc, status: "synced", syncedAt: timestamp }
-                  : doc
+                  : doc,
               ),
             }
-          : email
-      )
+          : email,
+      ),
     );
   };
 
@@ -195,7 +196,10 @@ export default function IntakeDashboard() {
       }}
     >
       {/* 🌙 TOGGLE */}
-      <h3 style={{ position: "fixed", top: 0, left: 2250, color: theme.text }}> Dark mode toggle </h3>
+      <h3 style={{ position: "fixed", top: 0, left: 2250, color: theme.text }}>
+        {" "}
+        Dark mode toggle{" "}
+      </h3>
       <div style={{ position: "fixed", top: 16, right: 16 }}>
         <div
           onClick={toggleDarkMode}
@@ -232,7 +236,7 @@ export default function IntakeDashboard() {
           background: theme.panel,
         }}
       >
-        <h2 style={{marginTop: 24, color: theme.text}}>Clients</h2>
+        <h2 style={{ marginTop: 24, color: theme.text }}>Clients</h2>
 
         <button style={buttonStyle} onClick={simulateEmail}>
           + Simulate Email
@@ -278,12 +282,19 @@ export default function IntakeDashboard() {
 
       {/* RIGHT PANEL */}
       {selectedClient && (
-        <div style={{ flex: 1, padding: 24 }}>
+        <div
+          style={{
+            flex: 1,
+            padding: 24,
+            height: "100vh", // make it fill viewport height
+            overflowY: "auto", // enable vertical scrolling
+          }}
+        >
           <div
             style={{
               background: theme.panel,
               borderRadius: 12,
-              padding: 64,
+              padding: 24,
               minHeight: "100%",
             }}
           >
@@ -291,16 +302,18 @@ export default function IntakeDashboard() {
               ← Close
             </button>
 
-            <h2 style={{marginTop: 24, color: theme.text}}>{selectedClient}</h2>
+            <h2 style={{ marginTop: 24, color: theme.text }}>
+              {selectedClient}
+            </h2>
 
             {(() => {
               const { docs, missing, hasStarted } = getClientDocStatus(
                 emails,
-                selectedClient
+                selectedClient,
               );
 
               const clientEmails = emails.filter(
-                (e) => e.clientName === selectedClient
+                (e) => e.clientName === selectedClient,
               );
 
               return (
@@ -333,7 +346,7 @@ export default function IntakeDashboard() {
 
                     {docs.map((doc) => {
                       const email = clientEmails.find((e) =>
-                        e.documents.includes(doc)
+                        e.documents.includes(doc),
                       )!;
 
                       return (

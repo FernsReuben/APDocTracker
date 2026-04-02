@@ -227,56 +227,71 @@ export default function IntakeDashboard() {
         </div>
       </div>
 
-      {/* LEFT PANEL */}
+      {/* LEFT PANEL WRAPPER */}
       <div
         style={{
-          width: 320,
-          padding: 20,
+          display: "flex",
+          flexDirection: "column",
+          width: "100%",
+          maxWidth: 360, // caps size on large screens
+          minWidth: 240, // prevents it from getting too small
+          flex: "0 0 25%", // takes ~25% of screen
           borderRight: `1px solid ${theme.border}`,
           background: theme.panel,
         }}
       >
-        <h2 style={{ marginTop: 24, color: theme.text }}>Clients</h2>
+        {/* TITLE ABOVE */}
+        <div style={{ padding: 20, borderBottom: `1px solid ${theme.border}` }}>
+          <h1 style={{ margin: 0, color: theme.text }}>CaseWorker</h1>
+        </div>
 
-        <button style={buttonStyle} onClick={simulateEmail}>
-          + Simulate Email
-        </button>
+        {/* PANEL CONTENT */}
+        <div style={{ padding: 20 }}>
+          <h2 style={{ marginTop: 24, color: theme.text }}>Clients</h2>
 
-        <div style={{ marginTop: 20 }}>
-          {clients.length === 0 && <div>No clients yet</div>}
+          <button style={buttonStyle} onClick={simulateEmail}>
+            + Simulate Email
+          </button>
 
-          {clients.map((client) => {
-            const { missing, hasStarted } = getClientDocStatus(emails, client);
+          <div style={{ marginTop: 20 }}>
+            {clients.length === 0 && <div>No clients yet</div>}
 
-            let status = "Not Started";
+            {clients.map((client) => {
+              const { missing, hasStarted } = getClientDocStatus(
+                emails,
+                client,
+              );
 
-            if (hasStarted) {
-              status =
-                missing.length === 0
-                  ? "Complete"
-                  : `In Progress (${missing.length} missing)`;
-            }
+              let status = "Not Started";
 
-            return (
-              <div
-                key={client}
-                onClick={() => setSelectedClient(client)}
-                style={{
-                  border: `1px solid ${theme.border}`,
-                  padding: 12,
-                  borderRadius: 8,
-                  marginBottom: 10,
-                  cursor: "pointer",
-                  background: theme.card,
-                }}
-              >
-                <strong>{client}</strong>
-                <div style={{ fontSize: 12, color: theme.subtext }}>
-                  {status}
+              if (hasStarted) {
+                status =
+                  missing.length === 0
+                    ? "Complete"
+                    : `In Progress (${missing.length} missing)`;
+              }
+
+              return (
+                <div
+                  key={client}
+                  onClick={() => setSelectedClient(client)}
+                  style={{
+                    border: `1px solid ${theme.border}`,
+                    padding: 12,
+                    borderRadius: 8,
+                    marginBottom: 10,
+                    cursor: "pointer",
+                    background: theme.card,
+                  }}
+                >
+                  <strong>{client}</strong>
+                  <div style={{ fontSize: 12, color: theme.subtext }}>
+                    {status}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
 

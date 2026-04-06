@@ -50,7 +50,9 @@ const getClientDocStatus = (emails: EmailThread[], clientName: string) => {
 export default function IntakeDashboard() {
   const [emails, setEmails] = useState<EmailThread[]>([]);
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
-  const [pendingReminderClient, setPendingReminderClient] = useState<string | null>(null);
+  const [pendingReminderClient, setPendingReminderClient] = useState<
+    string | null
+  >(null);
 
   // 🌙 DARK MODE
   const getInitialTheme = () => {
@@ -61,7 +63,7 @@ export default function IntakeDashboard() {
 
   const [isDark, setIsDark] = useState(getInitialTheme);
   const [manualOverride, setManualOverride] = useState(
-    localStorage.getItem("theme") !== null
+    localStorage.getItem("theme") !== null,
   );
 
   useEffect(() => {
@@ -161,11 +163,11 @@ export default function IntakeDashboard() {
           ? {
               ...email,
               documents: email.documents.map((doc) =>
-                doc.id === docId ? { ...doc, status: "cm_review" } : doc
+                doc.id === docId ? { ...doc, status: "cm_review" } : doc,
               ),
             }
-          : email
-      )
+          : email,
+      ),
     );
   };
 
@@ -180,11 +182,11 @@ export default function IntakeDashboard() {
               documents: email.documents.map((doc) =>
                 doc.id === docId
                   ? { ...doc, status: "cms_synced", syncedAt: timestamp }
-                  : doc
+                  : doc,
               ),
             }
-          : email
-      )
+          : email,
+      ),
     );
   };
 
@@ -249,7 +251,10 @@ export default function IntakeDashboard() {
             {clients.length === 0 && <div>No clients yet</div>}
 
             {clients.map((client) => {
-              const { missing, hasStarted } = getClientDocStatus(emails, client);
+              const { missing, hasStarted } = getClientDocStatus(
+                emails,
+                client,
+              );
 
               let status = "Not Started";
               if (hasStarted) {
@@ -301,22 +306,34 @@ export default function IntakeDashboard() {
             <h2 style={{ marginTop: 24 }}>{selectedClient}</h2>
 
             {(() => {
-              const { docs, missing, hasStarted } = getClientDocStatus(
+              const { docs, missing } = getClientDocStatus(
                 emails,
-                selectedClient
+                selectedClient,
               );
 
               const clientEmails = emails.filter(
-                (e) => e.clientName === selectedClient
+                (e) => e.clientName === selectedClient,
               );
 
               return (
                 <>
+                  {/* 🔔 CLIENT-LEVEL ACTIONS */}
+                  <div style={{ marginTop: 12, marginBottom: 20 }}>
+                    {missing.length > 0 && (
+                      <button
+                        style={buttonStyle}
+                        onClick={() => sendReminder(selectedClient)}
+                      >
+                        🔔 Send Reminder
+                      </button>
+                    )}
+                  </div>
+
                   <h3>Documents</h3>
 
                   {docs.map((doc) => {
                     const email = clientEmails.find((e) =>
-                      e.documents.includes(doc)
+                      e.documents.includes(doc),
                     )!;
 
                     return (
@@ -344,14 +361,13 @@ export default function IntakeDashboard() {
                                 doc.status === "pm_review"
                                   ? theme.warning
                                   : doc.status === "cm_review"
-                                  ? theme.info
-                                  : theme.success,
+                                    ? theme.info
+                                    : theme.success,
                             }}
                           >
                             {doc.status === "pm_review" && "🟡 PM Review"}
                             {doc.status === "cm_review" && "🔵 CM Review"}
-                            {doc.status === "cms_synced" &&
-                              "🟢 Synced to CMS"}
+                            {doc.status === "cms_synced" && "🟢 Synced to CMS"}
                           </span>
                         </div>
 

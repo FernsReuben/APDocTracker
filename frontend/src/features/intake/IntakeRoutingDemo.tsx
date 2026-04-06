@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-type DocStatus = "routed" | "synced";
+type DocStatus = "pm_review" | "cm_review" | "cms_synced";
 
 type DocumentItem = {
   id: number;
@@ -32,20 +32,12 @@ const getPTTimestamp = () =>
   new Date().toLocaleString("en-US", {
     timeZone: "America/Los_Angeles",
     hour12: false,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
   });
 
 const getClientDocStatus = (emails: EmailThread[], clientName: string) => {
   const clientEmails = emails.filter((e) => e.clientName === clientName);
-
   const hasStarted = clientEmails.length > 0;
   const docs = clientEmails.flatMap((e) => e.documents);
-
   const receivedTypes = new Set(docs.map((d) => d.type));
 
   const missing = hasStarted
@@ -58,9 +50,7 @@ const getClientDocStatus = (emails: EmailThread[], clientName: string) => {
 export default function IntakeDashboard() {
   const [emails, setEmails] = useState<EmailThread[]>([]);
   const [selectedClient, setSelectedClient] = useState<string | null>(null);
-  const [pendingReminderClient, setPendingReminderClient] = useState<
-    string | null
-  >(null);
+  const [pendingReminderClient, setPendingReminderClient] = useState<string | null>(null);
 
   // 🌙 DARK MODE
   const getInitialTheme = () => {
@@ -71,15 +61,13 @@ export default function IntakeDashboard() {
 
   const [isDark, setIsDark] = useState(getInitialTheme);
   const [manualOverride, setManualOverride] = useState(
-    localStorage.getItem("theme") !== null,
+    localStorage.getItem("theme") !== null
   );
 
   useEffect(() => {
     if (manualOverride) return;
-
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const listener = (e: MediaQueryListEvent) => setIsDark(e.matches);
-
     media.addEventListener("change", listener);
     return () => media.removeEventListener("change", listener);
   }, [manualOverride]);
@@ -102,6 +90,7 @@ export default function IntakeDashboard() {
     success: isDark ? "#4ade80" : "#16a34a",
     danger: isDark ? "#f87171" : "#dc2626",
     warning: isDark ? "#facc15" : "#ca8a04",
+    info: "#60a5fa",
 
     buttonBg: isDark ? "#374151" : "#e5e7eb",
     buttonText: isDark ? "#e5e7eb" : "#111",
@@ -114,6 +103,7 @@ export default function IntakeDashboard() {
     padding: "6px 10px",
     borderRadius: 6,
     cursor: "pointer",
+    marginTop: 6,
   };
 
   const clients = Array.from(new Set(emails.map((e) => e.clientName)));
@@ -129,7 +119,6 @@ export default function IntakeDashboard() {
       setPendingReminderClient(null);
     } else {
       const nextClientNumber = clients.length + 1;
-
       if (nextClientNumber > MAX_CLIENTS) {
         alert("Max clients reached");
         return;
@@ -138,7 +127,6 @@ export default function IntakeDashboard() {
       clientName = `Client ${nextClientNumber}`;
 
       const count = Math.floor(Math.random() * 5) + 1;
-
       docsToSend = [...REQUIRED_DOCS]
         .sort(() => 0.5 - Math.random())
         .slice(0, count);
@@ -153,7 +141,7 @@ export default function IntakeDashboard() {
         id: Date.now() + Math.random(),
         type,
         routedAt: getPTTimestamp(),
-        status: "routed",
+        status: "pm_review",
       })),
     };
 
@@ -165,7 +153,23 @@ export default function IntakeDashboard() {
     alert(`Reminder sent to ${clientName}`);
   };
 
-  const syncDoc = (emailId: number, docId: number) => {
+  // 🚀 ROUTING FUNCTIONS
+  const routeToCM = (emailId: number, docId: number) => {
+    setEmails((prev) =>
+      prev.map((email) =>
+        email.id === emailId
+          ? {
+              ...email,
+              documents: email.documents.map((doc) =>
+                doc.id === docId ? { ...doc, status: "cm_review" } : doc
+              ),
+            }
+          : email
+      )
+    );
+  };
+
+  const sendToCMS = (emailId: number, docId: number) => {
     const timestamp = getPTTimestamp();
 
     setEmails((prev) =>
@@ -175,12 +179,12 @@ export default function IntakeDashboard() {
               ...email,
               documents: email.documents.map((doc) =>
                 doc.id === docId
-                  ? { ...doc, status: "synced", syncedAt: timestamp }
-                  : doc,
+                  ? { ...doc, status: "cms_synced", syncedAt: timestamp }
+                  : doc
               ),
             }
-          : email,
-      ),
+          : email
+      )
     );
   };
 
@@ -196,10 +200,6 @@ export default function IntakeDashboard() {
       }}
     >
       {/* 🌙 TOGGLE */}
-      <h3 style={{ position: "fixed", top: 0, left: 2250, color: theme.text }}>
-        {" "}
-        Dark mode toggle{" "}
-      </h3>
       <div style={{ position: "fixed", top: 16, right: 16 }}>
         <div
           onClick={toggleDarkMode}
@@ -227,28 +227,20 @@ export default function IntakeDashboard() {
         </div>
       </div>
 
-      {/* LEFT PANEL WRAPPER */}
+      {/* LEFT PANEL */}
       <div
         style={{
           display: "flex",
           flexDirection: "column",
           width: "100%",
-          maxWidth: 360, // caps size on large screens
-          minWidth: 240, // prevents it from getting too small
-          flex: "0 0 25%", // takes ~25% of screen
+          maxWidth: 360,
+          flex: "0 0 25%",
           borderRight: `1px solid ${theme.border}`,
           background: theme.panel,
         }}
       >
-        {/* TITLE ABOVE */}
-        <div style={{ padding: 20, borderBottom: `1px solid ${theme.border}` }}>
-          <h1 style={{ margin: 0, color: theme.text }}>CaseWorker</h1>
-        </div>
-
-        {/* PANEL CONTENT */}
         <div style={{ padding: 20 }}>
-          <h2 style={{ marginTop: 24, color: theme.text }}>Clients</h2>
-
+          <h1>CaseWorker</h1>
           <button style={buttonStyle} onClick={simulateEmail}>
             + Simulate Email
           </button>
@@ -257,13 +249,9 @@ export default function IntakeDashboard() {
             {clients.length === 0 && <div>No clients yet</div>}
 
             {clients.map((client) => {
-              const { missing, hasStarted } = getClientDocStatus(
-                emails,
-                client,
-              );
+              const { missing, hasStarted } = getClientDocStatus(emails, client);
 
               let status = "Not Started";
-
               if (hasStarted) {
                 status =
                   missing.length === 0
@@ -297,14 +285,7 @@ export default function IntakeDashboard() {
 
       {/* RIGHT PANEL */}
       {selectedClient && (
-        <div
-          style={{
-            flex: 1,
-            padding: 24,
-            height: "100vh", // make it fill viewport height
-            overflowY: "auto", // enable vertical scrolling
-          }}
-        >
+        <div style={{ flex: 1, padding: 24, overflowY: "auto" }}>
           <div
             style={{
               background: theme.panel,
@@ -317,129 +298,89 @@ export default function IntakeDashboard() {
               ← Close
             </button>
 
-            <h2 style={{ marginTop: 24, color: theme.text }}>
-              {selectedClient}
-            </h2>
+            <h2 style={{ marginTop: 24 }}>{selectedClient}</h2>
 
             {(() => {
               const { docs, missing, hasStarted } = getClientDocStatus(
                 emails,
-                selectedClient,
+                selectedClient
               );
 
               const clientEmails = emails.filter(
-                (e) => e.clientName === selectedClient,
+                (e) => e.clientName === selectedClient
               );
 
               return (
                 <>
-                  <div style={{ marginBottom: 20 }}>
-                    <h3>Status</h3>
+                  <h3>Documents</h3>
 
-                    {!hasStarted ? (
-                      <div>Not Started</div>
-                    ) : missing.length === 0 ? (
-                      <div style={{ color: theme.success }}>✅ Complete</div>
-                    ) : (
-                      <div style={{ color: theme.danger }}>
-                        Missing: {missing.join(", ")}
-                      </div>
-                    )}
+                  {docs.map((doc) => {
+                    const email = clientEmails.find((e) =>
+                      e.documents.includes(doc)
+                    )!;
 
-                    {hasStarted && missing.length > 0 && (
-                      <button
-                        style={buttonStyle}
-                        onClick={() => sendReminder(selectedClient)}
-                      >
-                        🔔 Send Reminder
-                      </button>
-                    )}
-                  </div>
-
-                  <div>
-                    <h3>Documents</h3>
-
-                    {docs.map((doc) => {
-                      const email = clientEmails.find((e) =>
-                        e.documents.includes(doc),
-                      )!;
-
-                      return (
-                        <div
-                          key={doc.id}
-                          style={{
-                            border: `1px solid ${theme.border}`,
-                            padding: 10,
-                            marginBottom: 8,
-                            borderRadius: 8,
-                            background: theme.card,
-                          }}
-                        >
-                          <div>{doc.type}</div>
-
-                          <div style={{ fontSize: 12, color: theme.subtext }}>
-                            Routed: {doc.routedAt}
-                          </div>
-
-                          <div style={{ fontSize: 12 }}>
-                            Status:{" "}
-                            <span
-                              style={{
-                                color:
-                                  doc.status === "routed"
-                                    ? theme.warning
-                                    : theme.success,
-                              }}
-                            >
-                              {doc.status === "routed"
-                                ? "🟡 Awaiting Review"
-                                : "🟢 Synced"}
-                            </span>
-                          </div>
-
-                          {doc.status === "routed" && (
-                            <button
-                              style={buttonStyle}
-                              onClick={() => syncDoc(email.id, doc.id)}
-                            >
-                              Send to CMS
-                            </button>
-                          )}
-
-                          {doc.syncedAt && (
-                            <div
-                              style={{
-                                fontSize: 12,
-                                color: theme.success,
-                              }}
-                            >
-                              ✅ Synced: {doc.syncedAt}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-
-                  <div style={{ marginTop: 20 }}>
-                    <h3>Email History</h3>
-
-                    {clientEmails.map((email) => (
+                    return (
                       <div
-                        key={email.id}
+                        key={doc.id}
                         style={{
                           border: `1px solid ${theme.border}`,
                           padding: 10,
-                          marginBottom: 10,
+                          marginBottom: 8,
                           borderRadius: 8,
                           background: theme.card,
                         }}
                       >
-                        📩 {email.emailId} —{" "}
-                        {email.documents.map((d) => d.type).join(", ")}
+                        <div>{doc.type}</div>
+
+                        <div style={{ fontSize: 12, color: theme.subtext }}>
+                          Routed: {doc.routedAt}
+                        </div>
+
+                        <div style={{ fontSize: 12 }}>
+                          Status:{" "}
+                          <span
+                            style={{
+                              color:
+                                doc.status === "pm_review"
+                                  ? theme.warning
+                                  : doc.status === "cm_review"
+                                  ? theme.info
+                                  : theme.success,
+                            }}
+                          >
+                            {doc.status === "pm_review" && "🟡 PM Review"}
+                            {doc.status === "cm_review" && "🔵 CM Review"}
+                            {doc.status === "cms_synced" &&
+                              "🟢 Synced to CMS"}
+                          </span>
+                        </div>
+
+                        {doc.status === "pm_review" && (
+                          <button
+                            style={buttonStyle}
+                            onClick={() => routeToCM(email.id, doc.id)}
+                          >
+                            Route to Case Manager
+                          </button>
+                        )}
+
+                        {doc.status === "cm_review" && (
+                          <button
+                            style={buttonStyle}
+                            onClick={() => sendToCMS(email.id, doc.id)}
+                          >
+                            Approve → Send to CMS
+                          </button>
+                        )}
+
+                        {doc.syncedAt && (
+                          <div style={{ fontSize: 12, color: theme.success }}>
+                            ✅ Synced: {doc.syncedAt}
+                          </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </>
               );
             })()}

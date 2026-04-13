@@ -1,6 +1,10 @@
 import { useState, useEffect } from "react";
 
-type DocStatus = "pm_review" | "cm_review" | "cms_synced";
+type DocStatus =
+  | "intake_review"
+  | "program_review"
+  | "intake_meeting"
+  | "case_magic";
 
 type DocumentItem = {
   id: number;
@@ -36,15 +40,13 @@ const getPTTimestamp = () =>
 
 const getClientDocStatus = (emails: EmailThread[], clientName: string) => {
   const clientEmails = emails.filter((e) => e.clientName === clientName);
-  const hasStarted = clientEmails.length > 0;
   const docs = clientEmails.flatMap((e) => e.documents);
+
   const receivedTypes = new Set(docs.map((d) => d.type));
 
-  const missing = hasStarted
-    ? REQUIRED_DOCS.filter((doc) => !receivedTypes.has(doc))
-    : [];
+  const missing = REQUIRED_DOCS.filter((doc) => !receivedTypes.has(doc));
 
-  return { docs, missing, hasStarted };
+  return { docs, missing };
 };
 
 export default function IntakeDashboard() {
@@ -90,7 +92,6 @@ export default function IntakeDashboard() {
     subtext: isDark ? "#9ca3af" : "#555",
 
     success: isDark ? "#4ade80" : "#16a34a",
-    danger: isDark ? "#f87171" : "#dc2626",
     warning: isDark ? "#facc15" : "#ca8a04",
     info: "#60a5fa",
 
@@ -143,7 +144,7 @@ export default function IntakeDashboard() {
         id: Date.now() + Math.random(),
         type,
         routedAt: getPTTimestamp(),
-        status: "pm_review",
+        status: "intake_review",
       })),
     };
 
@@ -156,14 +157,16 @@ export default function IntakeDashboard() {
   };
 
   // 🚀 ROUTING FUNCTIONS
-  const routeToCM = (emailId: number, docId: number) => {
+  const routeToProgramManager = (emailId: number, docId: number) => {
     setEmails((prev) =>
       prev.map((email) =>
         email.id === emailId
           ? {
               ...email,
               documents: email.documents.map((doc) =>
-                doc.id === docId ? { ...doc, status: "cm_review" } : doc,
+                doc.id === docId
+                  ? { ...doc, status: "program_review" }
+                  : doc,
               ),
             }
           : email,
@@ -171,7 +174,24 @@ export default function IntakeDashboard() {
     );
   };
 
-  const sendToCMS = (emailId: number, docId: number) => {
+  const moveToIntakeMeeting = (emailId: number, docId: number) => {
+    setEmails((prev) =>
+      prev.map((email) =>
+        email.id === emailId
+          ? {
+              ...email,
+              documents: email.documents.map((doc) =>
+                doc.id === docId
+                  ? { ...doc, status: "intake_meeting" }
+                  : doc,
+              ),
+            }
+          : email,
+      ),
+    );
+  };
+
+  const sendToCaseMagic = (emailId: number, docId: number) => {
     const timestamp = getPTTimestamp();
 
     setEmails((prev) =>
@@ -181,7 +201,11 @@ export default function IntakeDashboard() {
               ...email,
               documents: email.documents.map((doc) =>
                 doc.id === docId
-                  ? { ...doc, status: "cms_synced", syncedAt: timestamp }
+                  ? {
+                      ...doc,
+                      status: "case_magic",
+                      syncedAt: timestamp,
+                    }
                   : doc,
               ),
             }
@@ -232,59 +256,44 @@ export default function IntakeDashboard() {
       {/* LEFT PANEL */}
       <div
         style={{
-          display: "flex",
-          flexDirection: "column",
-          width: "100%",
-          maxWidth: 360,
-          flex: "0 0 25%",
+          width: 320,
+          padding: 20,
           borderRight: `1px solid ${theme.border}`,
           background: theme.panel,
         }}
       >
-        <div style={{ padding: 20 }}>
-          <h1>CaseWorker</h1>
-          <button style={buttonStyle} onClick={simulateEmail}>
-            + Simulate Email
-          </button>
+        <h2>Clients</h2>
 
-          <div style={{ marginTop: 20 }}>
-            {clients.length === 0 && <div>No clients yet</div>}
+        <button style={buttonStyle} onClick={simulateEmail}>
+          + Simulate Email
+        </button>
 
-            {clients.map((client) => {
-              const { missing, hasStarted } = getClientDocStatus(
-                emails,
-                client,
-              );
+        <div style={{ marginTop: 20 }}>
+          {clients.map((client) => {
+            const { missing } = getClientDocStatus(emails, client);
 
-              let status = "Not Started";
-              if (hasStarted) {
-                status =
-                  missing.length === 0
+            return (
+              <div
+                key={client}
+                onClick={() => setSelectedClient(client)}
+                style={{
+                  border: `1px solid ${theme.border}`,
+                  padding: 12,
+                  borderRadius: 8,
+                  marginBottom: 10,
+                  cursor: "pointer",
+                  background: theme.card,
+                }}
+              >
+                <strong>{client}</strong>
+                <div style={{ fontSize: 12, color: theme.subtext }}>
+                  {missing.length === 0
                     ? "Complete"
-                    : `In Progress (${missing.length} missing)`;
-              }
-
-              return (
-                <div
-                  key={client}
-                  onClick={() => setSelectedClient(client)}
-                  style={{
-                    border: `1px solid ${theme.border}`,
-                    padding: 12,
-                    borderRadius: 8,
-                    marginBottom: 10,
-                    cursor: "pointer",
-                    background: theme.card,
-                  }}
-                >
-                  <strong>{client}</strong>
-                  <div style={{ fontSize: 12, color: theme.subtext }}>
-                    {status}
-                  </div>
+                    : `${missing.length} missing`}
                 </div>
-              );
-            })}
-          </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -317,7 +326,6 @@ export default function IntakeDashboard() {
 
               return (
                 <>
-                  {/* 🔔 CLIENT-LEVEL ACTIONS */}
                   <div style={{ marginTop: 12, marginBottom: 20 }}>
                     {missing.length > 0 && (
                       <button
@@ -358,39 +366,63 @@ export default function IntakeDashboard() {
                           <span
                             style={{
                               color:
-                                doc.status === "pm_review"
+                                doc.status === "intake_review"
                                   ? theme.warning
-                                  : doc.status === "cm_review"
+                                  : doc.status === "program_review"
                                     ? theme.info
-                                    : theme.success,
+                                    : doc.status === "intake_meeting"
+                                      ? theme.warning
+                                      : theme.success,
                             }}
                           >
-                            {doc.status === "pm_review" && "🟡 PM Review"}
-                            {doc.status === "cm_review" && "🔵 CM Review"}
-                            {doc.status === "cms_synced" && "🟢 Synced to CMS"}
+                            {doc.status === "intake_review" &&
+                              "🟡 Intake Manager Review"}
+                            {doc.status === "program_review" &&
+                              "🔵 Program Manager Review"}
+                            {doc.status === "intake_meeting" &&
+                              "🟠 Intake Meeting"}
+                            {doc.status === "case_magic" &&
+                              "🟢 In Case Magic"}
                           </span>
                         </div>
 
-                        {doc.status === "pm_review" && (
+                        {doc.status === "intake_review" && (
                           <button
                             style={buttonStyle}
-                            onClick={() => routeToCM(email.id, doc.id)}
+                            onClick={() =>
+                              routeToProgramManager(email.id, doc.id)
+                            }
                           >
-                            Route to Case Manager
+                            Route to Program Manager
                           </button>
                         )}
 
-                        {doc.status === "cm_review" && (
+                        {doc.status === "program_review" && (
                           <button
                             style={buttonStyle}
-                            onClick={() => sendToCMS(email.id, doc.id)}
+                            onClick={() =>
+                              moveToIntakeMeeting(email.id, doc.id)
+                            }
                           >
-                            Approve → Send to CMS
+                            Move to Intake Meeting
+                          </button>
+                        )}
+
+                        {doc.status === "intake_meeting" && (
+                          <button
+                            style={buttonStyle}
+                            onClick={() =>
+                              sendToCaseMagic(email.id, doc.id)
+                            }
+                          >
+                            Complete → Add to Case Magic
                           </button>
                         )}
 
                         {doc.syncedAt && (
-                          <div style={{ fontSize: 12, color: theme.success }}>
+                          <div
+                            style={{ fontSize: 12, color: theme.success }}
+                          >
                             ✅ Synced: {doc.syncedAt}
                           </div>
                         )}

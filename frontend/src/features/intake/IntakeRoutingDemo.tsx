@@ -60,7 +60,6 @@ export default function IntakeDashboard() {
   const [role, setRole] = useState<Role>("intake_manager");
   const [reminderQueue, setReminderQueue] = useState<string[]>([]);
 
-  // 🌙 theme (unchanged)
   const getInitialTheme = () => {
     const saved = localStorage.getItem("theme");
     if (saved) return saved === "dark";
@@ -224,7 +223,7 @@ export default function IntakeDashboard() {
   };
 
   // =============================
-  // INTake Manager VIEW
+  // Intake Manager VIEW
   // =============================
   const IntakeManagerView = () => {
     const incomingDocs: IncomingDocView[] = getIncomingDocuments(emails);
@@ -249,7 +248,7 @@ export default function IntakeDashboard() {
             overflowY: "auto",
           }}
         >
-          <h2>📥 Intake Inbox (Amy)</h2>
+          <h2 style={{ color: theme.text }}>Intake Inbox</h2>
 
           <button style={buttonStyle} onClick={simulateEmail}>
             + Simulate Incoming Referral
@@ -298,7 +297,6 @@ export default function IntakeDashboard() {
                           : `${missing.length} missing`}
                       </div>
 
-                      {/* 🔔 REMINDER */}
                       {missing.length > 0 && (
                         <button
                           style={{
@@ -399,7 +397,7 @@ export default function IntakeDashboard() {
         <div style={{ flex: 1, padding: 24, overflowY: "auto" }}>
           {activeDoc ? (
             <>
-              <h2>{activeDoc.type}</h2>
+              <h2 style={{ color: theme.text }}>{activeDoc.type}</h2>
 
               <div style={{ marginTop: 12 }}>
                 <p style={{ color: theme.subtext }}>
@@ -465,79 +463,154 @@ export default function IntakeDashboard() {
   // PROGRAM MANAGER VIEW
   // =============================
   const ProgramManagerView = () => {
-    if (!selectedClient) {
-      return (
-        <div style={{ padding: 24 }}>
-          <h2>Program Manager</h2>
-          <p>Select a client to review intake documents.</p>
-        </div>
-      );
-    }
-
-    const { docs } = getClientDocStatus(emails, selectedClient);
-    const clientEmails = emails.filter((e) => e.clientName === selectedClient);
-
     return (
-      <div style={{ padding: 24 }}>
-        <h2>{selectedClient} — Program Review</h2>
+      <div style={{ display: "flex", height: "100%" }}>
+        {/* =========================
+        LEFT: CLIENT LIST
+      ========================== */}
+        <div
+          style={{
+            width: 320,
+            padding: 20,
+            borderRight: `1px solid ${theme.border}`,
+            background: theme.panel,
+            overflowY: "auto",
+          }}
+        >
+          <h2 style={{ color: theme.text }}>Program Manager</h2>
 
-        {docs.map((doc) => {
-          const email = clientEmails.find((e) => e.documents.includes(doc))!;
+          {clients.map((client) => {
+            const { docs } = getClientDocStatus(emails, client);
 
-          return (
-            <div
-              key={doc.id}
-              style={{
-                border: `1px solid ${theme.border}`,
-                padding: 12,
-                marginBottom: 10,
-                borderRadius: 8,
-                background: theme.card,
-              }}
-            >
-              <div>{doc.type}</div>
+            // ✅ ONLY docs that intake has sent forward
+            const visibleDocs = docs.filter(
+              (d) => d.status !== "intake_review",
+            );
 
-              <div style={{ fontSize: 12, color: theme.subtext }}>
-                Routed: {doc.routedAt}
-              </div>
+            const pendingCount = visibleDocs.filter(
+              (d) => d.status === "program_review",
+            ).length;
 
-              <div style={{ fontSize: 12 }}>Status: {doc.status}</div>
+            // Optional: hide clients with nothing visible
+            if (visibleDocs.length === 0) return null;
 
-              {doc.status === "intake_review" && (
-                <button
-                  style={buttonStyle}
-                  onClick={() => routeToProgramManager(email.id, doc.id)}
-                >
-                  Send to Program Review
-                </button>
-              )}
-
-              {doc.status === "program_review" && (
-                <button
-                  style={buttonStyle}
-                  onClick={() => moveToIntakeMeeting(email.id, doc.id)}
-                >
-                  Schedule Intake Meeting
-                </button>
-              )}
-
-              {doc.status === "intake_meeting" && (
-                <button
-                  style={buttonStyle}
-                  onClick={() => sendToCaseMagic(email.id, doc.id)}
-                >
-                  Complete → Case Magic
-                </button>
-              )}
-
-              {doc.syncedAt && (
-                <div style={{ color: theme.success, fontSize: 12 }}>
-                  ✅ Synced {doc.syncedAt}
+            return (
+              <div
+                key={client}
+                onClick={() => setSelectedClient(client)}
+                style={{
+                  border: `1px solid ${theme.border}`,
+                  padding: 12,
+                  borderRadius: 8,
+                  marginBottom: 10,
+                  cursor: "pointer",
+                  background:
+                    selectedClient === client ? theme.card : "transparent",
+                }}
+              >
+                <div style={{ fontWeight: 600, color: theme.text }}>
+                  {client}
                 </div>
-              )}
-            </div>
-          );
-        })}
+
+                <div style={{ fontSize: 12, color: theme.subtext }}>
+                  {pendingCount > 0
+                    ? `${pendingCount} docs to review`
+                    : "No pending items"}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* =========================
+        RIGHT: CLIENT DETAIL
+      ========================== */}
+        <div style={{ flex: 1, padding: 24, overflowY: "auto" }}>
+          {!selectedClient ? (
+            <p style={{ color: theme.subtext }}>
+              Select a client to review intake documents.
+            </p>
+          ) : (
+            <>
+              <h2 style={{ color: theme.text }}>
+                {selectedClient} — Program Review
+              </h2>
+
+              {(() => {
+                const { docs } = getClientDocStatus(emails, selectedClient);
+                const clientEmails = emails.filter(
+                  (e) => e.clientName === selectedClient,
+                );
+
+                // ✅ HARD FILTER — core rule enforcement
+                const visibleDocs = docs.filter(
+                  (doc) => doc.status !== "intake_review",
+                );
+
+                if (visibleDocs.length === 0) {
+                  return (
+                    <p style={{ color: theme.subtext }}>
+                      No documents have been sent for program review yet.
+                    </p>
+                  );
+                }
+
+                return visibleDocs.map((doc) => {
+                  const email = clientEmails.find((e) =>
+                    e.documents.includes(doc),
+                  )!;
+
+                  return (
+                    <div
+                      key={doc.id}
+                      style={{
+                        border: `1px solid ${theme.border}`,
+                        padding: 12,
+                        marginBottom: 10,
+                        borderRadius: 8,
+                        background: theme.card,
+                      }}
+                    >
+                      <div style={{ fontWeight: 600 }}>{doc.type}</div>
+
+                      <div style={{ fontSize: 12, color: theme.subtext }}>
+                        Routed: {doc.routedAt}
+                      </div>
+
+                      <div style={{ fontSize: 12 }}>Status: {doc.status}</div>
+
+                      {/* ACTIONS */}
+
+                      {doc.status === "program_review" && (
+                        <button
+                          style={buttonStyle}
+                          onClick={() => moveToIntakeMeeting(email.id, doc.id)}
+                        >
+                          Schedule Intake Meeting
+                        </button>
+                      )}
+
+                      {doc.status === "intake_meeting" && (
+                        <button
+                          style={buttonStyle}
+                          onClick={() => sendToCaseMagic(email.id, doc.id)}
+                        >
+                          Complete → Case Magic
+                        </button>
+                      )}
+
+                      {doc.syncedAt && (
+                        <div style={{ color: theme.success, fontSize: 12 }}>
+                          ✅ Synced {doc.syncedAt}
+                        </div>
+                      )}
+                    </div>
+                  );
+                });
+              })()}
+            </>
+          )}
+        </div>
       </div>
     );
   };

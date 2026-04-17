@@ -4,7 +4,8 @@ type DocStatus =
   | "intake_review"
   | "program_review"
   | "intake_meeting"
-  | "case_magic";
+  | "case_magic"
+  | "needs_revision";
 
 type DocumentItem = {
   id: number;
@@ -122,10 +123,33 @@ export default function IntakeDashboard() {
     if (reminderQueue.length > 0) {
       clientName = reminderQueue[0];
 
-      const { missing } = getClientDocStatus(emails, clientName);
+      const { missing, docs } = getClientDocStatus(emails, clientName);
 
-      // simulate that client finally responds with missing docs
-      docsToSend = missing.length ? missing : [...REQUIRED_DOCS].slice(0, 1); // fallback response
+      const needsFixDocs = docs.filter((d) => d.status === "needs_revision");
+
+      if (needsFixDocs.length > 0) {
+        docsToSend = needsFixDocs.map((d) => d.type);
+
+        // ✅ FIX: clear the old "needs_revision" flags
+        setEmails((prev) =>
+          prev.map((email) =>
+            email.clientName === clientName
+              ? {
+                  ...email,
+                  documents: email.documents.map((doc) =>
+                    doc.status === "needs_revision"
+                      ? { ...doc, status: "intake_review" }
+                      : doc,
+                  ),
+                }
+              : email,
+          ),
+        );
+      } else if (missing.length > 0) {
+        docsToSend = missing;
+      } else {
+        docsToSend = [...REQUIRED_DOCS].slice(0, 1);
+      }
 
       setReminderQueue((prev) => prev.slice(1));
     } else {
@@ -222,8 +246,30 @@ export default function IntakeDashboard() {
     );
   };
 
+  const revertToClient = (emailId: number, docId: number) => {
+    setEmails((prev) =>
+      prev.map((email) =>
+        email.id === emailId
+          ? {
+              ...email,
+              documents: email.documents.map((doc) =>
+                doc.id === docId ? { ...doc, status: "needs_revision" } : doc,
+              ),
+            }
+          : email,
+      ),
+    );
+
+    // add to reminder queue so they send corrected doc next time
+    const email = emails.find((e) => e.id === emailId);
+    if (email) {
+      setReminderQueue((prev) => [...prev, email.clientName]);
+    }
+
+    alert("Document marked as incomplete. Client will be notified.");
+  };
   // =============================
-  // Intake Manager VIEW
+  // INTAKE MANAGER VIEW
   // =============================
   const IntakeManagerView = () => {
     const incomingDocs: IncomingDocView[] = getIncomingDocuments(emails);
@@ -414,7 +460,14 @@ export default function IntakeDashboard() {
 
                 <p>
                   Status:{" "}
-                  <span style={{ color: theme.warning }}>
+                  <span
+                    style={{
+                      color:
+                        activeDoc.status === "needs_revision"
+                          ? theme.warning
+                          : theme.info,
+                    }}
+                  >
                     {activeDoc.status}
                   </span>
                 </p>
@@ -442,6 +495,24 @@ export default function IntakeDashboard() {
                   onClick={() => setActiveDocId(null)}
                 >
                   Clear Selection
+                </button>
+
+                <button
+                  style={{
+                    ...buttonStyle,
+                    background: "#f87171", // red-ish for rejection
+                    color: "#000",
+                  }}
+                  onClick={() =>
+                    revertToClient(
+                      emails.find((e) =>
+                        e.documents.some((d) => d.id === activeDoc.id),
+                      )!.id,
+                      activeDoc.id,
+                    )
+                  }
+                >
+                  ↩️ Revert to Client
                 </button>
               </div>
             </>
